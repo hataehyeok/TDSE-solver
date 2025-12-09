@@ -1,5 +1,7 @@
 # Document about `tdse_solver.py`
 
+Algorithm of simulation about Bloch Oscillation is based on the Poste [Bloch Oscillation in 1D Model Potential](http://staff.ustc.edu.cn/~zqj/posts/1D-BlochOscillation/). We refer this code and simulation method.
+
 ## Used Variables
 
 ### System & Potential
@@ -78,39 +80,12 @@ This is the mathematical formulation of bloch simulation
 - **Crank-Nicolson Method (CN):**
     $$\left(1 + \frac{i\hat{H}\Delta t}{2}\right) \Psi(t+\Delta t) = \left(1 - \frac{i\hat{H}\Delta t}{2}\right) \Psi(t)$$
 
-```python
-def run_bloch_simulation(a, v0, qE, dt, ngx, nbnds, k0_center, sigma_k, 
-                         Nc, Nx, x_range, n_periods, solver, filename, frame_skip, fps=25):
-    b = 2 * np.pi / a
-    Tbloch = 2 * np.pi / (qE * a)
-    L = Nc * a
-    
-    x = np.linspace(x_range[0] * L, x_range[1] * L, Nx)
-    Vx = 2 * v0 * np.cos(b * x) - qE * x
-    
-    kwp, fk = get_bloch_wavepacket_gaussian_envelop(k0_center, sigma_k=sigma_k, nk=100, Nsigma=10)
-    bloch_wp = construct_blochwp_cosx_pot(x, kwp, fk, a=a, v0=v0, nbnds=nbnds, ngx=ngx)
-    
-    k_1d_bz = np.linspace(-0.5, 0.5, 100)
-    Gx = np.arange(ngx, dtype=int)
-    Gx[ngx // 2 + 1:] -= ngx
-    
-    Enk, phi_nk = [], []
-    for k in k_1d_bz:
-        e, c = epsilon_nk_cosx_pot(k, a=a, v0=v0, ngx=ngx, nbnds=nbnds, Ngmax=1)
-        Enk.append(e)
-        phi_nk.append(np.sum(c[0][:, None] * np.exp(1j * b * (Gx + k)[:, None] * x[None, :]), axis=0))
-    
-    Enk, phi_nk = np.asarray(Enk), np.asarray(phi_nk)
-    
-    NSW = n_periods * int(Tbloch / dt)
-    PSI0 = solver(bloch_wp, Vx, x, dt, NSW, False)
-    
-    create_bloch_animation(
-        PSI0, Enk, phi_nk, Vx, x, k_1d_bz,
-        params={'a': a, 'dt': dt, 'Tbloch': Tbloch, 'n0': 0, 'nbnds': nbnds},
-        filename=filename,
-        frame_skip=frame_skip,
-        fps=fps
-    )
-```
+## Algorithm of `epsilon_nk_cosx_pot`
+
+## Algorithm of `get_bloch_wavepacket_gaussian_envelop`
+
+## Algorithm of `construct_blochwp_cosx_pot`
+
+## Algorithm of `CrankNicolson`
+
+## Algorithm of `SplitStepFourier`
