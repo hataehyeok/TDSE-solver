@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.ticker import AutoMinorLocator
 
-def create_bloch_animation(PSI0, Enk, phi_nk, Vx, x, k_1d_bz, params, filename='bloch_anim.mp4'):
+def create_bloch_animation(PSI0, Enk, phi_nk, Vx, x, k_1d_bz, params, filename='bloch_anim.mp4', frame_skip=10, fps=25):
     """
     Bloch Oscillation 시뮬레이션 결과를 받아 애니메이션을 생성 및 저장합니다.
     
@@ -16,6 +16,8 @@ def create_bloch_animation(PSI0, Enk, phi_nk, Vx, x, k_1d_bz, params, filename='
     - k_1d_bz: k-공간 배열 (Nk,)
     - params: 시뮬레이션 파라미터 딕셔너리 {'a', 'dt', 'Tbloch', 'n0', 'nbnds'}
     - filename: 저장할 파일명
+    - frame_skip: 프레임 건너뛰기 간격 (클수록 짧은 영상)
+    - fps: 초당 프레임 수
     """
     
     # --- 1. 데이터 전처리 (Vectorized) ---
@@ -23,10 +25,35 @@ def create_bloch_animation(PSI0, Enk, phi_nk, Vx, x, k_1d_bz, params, filename='
     a, dt, Tbloch = params['a'], params['dt'], params['Tbloch']
     n0, nbnds = params['n0'], params['nbnds']
     
-    # 위치 기댓값 <x> 계산
+    # 화면 범위 설정 (x/a 단위)
+    xlim_min, xlim_max = -30, 60
+    
+    # 피크 주변 국소 무게중심으로 부드러운 위치 추적
     rho = np.abs(PSI0)**2
-    norm = np.sum(rho, axis=0)
-    X0 = np.sum(rho * x[:, None], axis=0) / norm / a
+    x_normalized = x / a
+    mask = (x_normalized >= xlim_min) & (x_normalized <= xlim_max)
+    
+    # 각 시간 스텝에서 피크 위치 계산
+    Nt = PSI0.shape[1]
+    X0 = np.zeros(Nt)
+    window_half = int(5 * a / (x[1] - x[0]))  # 피크 주변 ±5a 윈도우
+    
+    for t in range(Nt):
+        rho_t = rho[:, t].copy()
+        rho_t[~mask] = 0
+        peak_idx = np.argmax(rho_t)
+        
+        # 피크 주변 윈도우에서 무게중심 계산
+        i_start = max(0, peak_idx - window_half)
+        i_end = min(len(x), peak_idx + window_half + 1)
+        
+        rho_window = rho_t[i_start:i_end]
+        x_window = x[i_start:i_end]
+        
+        if np.sum(rho_window) > 0:
+            X0[t] = np.sum(rho_window * x_window) / np.sum(rho_window) / a
+        else:
+            X0[t] = x[peak_idx] / a
     
     # k-공간 투영 (Loop 제거 및 최적화)
     # phi_nk.conj() shape: (Nk, Nx), PSI0 shape: (Nx, Nt) -> (Nk, Nt)
@@ -73,7 +100,7 @@ def create_bloch_animation(PSI0, Enk, phi_nk, Vx, x, k_1d_bz, params, filename='
     
     # 축 설정
     ax_wave.xaxis.set_minor_locator(AutoMinorLocator(n=5))
-    ax_wave.set_xlim(-30, 60)
+    ax_wave.set_xlim(xlim_min, xlim_max)
     ax_wave.set_ylim(-0.02, 0.25)
     ax_pot.set_ylim(-0.80, 0.20)
     
@@ -92,9 +119,11 @@ def create_bloch_animation(PSI0, Enk, phi_nk, Vx, x, k_1d_bz, params, filename='
 
     # --- 3. 애니메이션 업데이트 함수 ---
     NSW = PSI0.shape[1]
+    n_frames = NSW // frame_skip
+    interval = 1000 // fps  # ms per frame
     
     def update(frame):
-        idx = frame * 10
+        idx = frame * frame_skip
         if idx >= NSW: idx = NSW - 1
         
         # 데이터 업데이트
@@ -109,7 +138,7 @@ def create_bloch_animation(PSI0, Enk, phi_nk, Vx, x, k_1d_bz, params, filename='
         return line_wfc, line_x0, scat, time_text
 
     # 애니메이션 생성 및 저장
-    ani = animation.FuncAnimation(fig, update, frames=NSW//10, interval=40, blit=True)
-    ani.save(filename, writer='ffmpeg', dpi=300)
+    ani = animation.FuncAnimation(fig, update, frames=n_frames, interval=interval, blit=True)
+    ani.save(filename, writer='ffmpeg', dpi=150)  # dpi 낮춤으로 저장 속도 향상
     plt.show()
-    print(f"Animation saved to {filename}")
+    print(f"Animation saved to {filename} ({n_frames} frames, ~{n_frames/fps:.1f}s)")
