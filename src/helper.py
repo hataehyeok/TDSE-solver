@@ -3,8 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.ticker import AutoMinorLocator
 
-def create_bloch_animation(PSI0, Enk, phi_nk, Vx, x, k_1d_bz, 
-                           params, filename='bloch_anim.mp4'):
+def create_bloch_animation(PSI0, Enk, phi_nk, Vx, x, k_1d_bz, params, filename='bloch_anim.mp4'):
     """
     Bloch Oscillation 시뮬레이션 결과를 받아 애니메이션을 생성 및 저장합니다.
     
